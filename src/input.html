@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>输入</title>
+    <script src="https://131462.wang/js/import/vue.js"></script>
+</head>
+<body>
+<div id="app">
+    <canvas id="canvas"></canvas>
+    <button @click="setState('point')">标记点模式</button>
+    <button @click="setState('line')">路径模式</button>
+    <button @click="getPoints()">获取所有点</button>
+    <button @click="printLine()">输出路径</button>
+    <button @click="printAll()">清空画布</button>
+    <div class="form">
+        <!--        不进入上传-->
+        <p>设置当前图地图</p>
+        <div class="form-item">
+            <label for="nowImg">nowImage:</label><input id="nowImg" v-model="nowImg" placeholder="name">
+            <button @click="setImg()">设置图片</button>
+        </div>
+        <p>路径存入</p>
+        <div class="form-item">
+            <label for="startPoint">startPoint:</label><input id="startPoint" v-model="startPoint" placeholder="startPoint">
+            <label for="endPoint">endPoint:</label><input id="endPoint" v-model="endPoint" placeholder="endPoint">
+            <button @click="setLine()">设置路径</button>
+        </div>
+        <p>地图标记点信息</p>
+        <!--上传数据-->
+        <div class="form-item">
+            <label for="name">name:</label><input id="name" v-model="name" placeholder="name">
+        </div>
+        <div class="form-item">
+            <label for="description">description:</label><input id="description" v-model="description"
+                                                                placeholder="description">
+        </div>
+        <select v-model="builder">
+            <option value="">--chose biuilder--</option>
+            <option v-for="(item) in builders" :value="item">{{item.name}}</option>
+        </select>
+        <div class="form-item">
+            <label for="bid">bid:</label><input id="bid" disabled="disabled" v-model="builder.bid" placeholder="bid" type="number">
+        </div>
+        <div class="form-item">
+            <label for="builderName">builderName:</label><input id="builderName" disabled="disabled" v-model="builder.name"
+                                                                placeholder="builderName">
+        </div>
+        <div class="form-item">
+            <label for="level">level:</label><input id="level" v-model="level" placeholder="level" type="number">
+        </div>
+        <div class="form-item">
+            <label for="position">position:</label><input id="position" v-model="position"
+                                                          placeholder="position">
+        </div>
+        <div class="form-item">
+            <label for="location">location:</label><input id="location" v-model="location"
+                                                          placeholder="location">
+        </div>
+        <div class="form-item">
+            <button @click="update()">上传</button>
+        </div>
+    </div>
+</div>
+<script>
+    let vue = new Vue({
+        el: '#app',
+        data: {
+            builder:{},
+            builders:[],
+            imgList: [],
+            nowImg: "",
+            state:"",
+            //canvas
+            canvas:{},
+            ctx:{},
+            size:{},
+            back:{},
+
+            points:[],
+            startPoint:"",
+            endPoint:"",
+            //表单数据
+            name: "",
+            description: "",
+            level: "",
+            position: "",
+            location: "",
+        },
+        computed:{
+            bid(){
+                return this.builder.bid;
+            },//不需要
+            builderName(){
+                return this.builder.name;
+            },//不需要
+        },
+        mounted() {
+            this.initBuilders();
+            this.initCanvas();
+        },
+        methods: {
+            initBuilders(){
+                let _this=this;
+                let form = new FormData();
+                form.append('type', 'readAll');
+                fetch('https://131462.wang/master/php/action.php', {
+                    method: "post",
+                    body: form
+                }).then(r => r.json())
+                    .then(res => {
+                        _this.builders=res.builders;
+                        console.log(res)
+                    }).catch(err => {
+                    console.log(err)
+                })
+            },
+            setState(state='point'){
+                console.log(state)
+                this.state=state;
+            },
+            initCanvas(){
+                //https://131462.wang/master/assets/img/cankao.webp
+                this.canvas = document.querySelector("#canvas");
+                this.ctx = this.canvas.getContext('2d');
+                this.size={width:500,height:700};
+                this.canvas.width = this.size.width;
+                this.canvas.height = this.size.height;
+                let _this=this;
+                this.canvas.onclick=function (event){
+                    if(_this.state=='line'){
+
+                        let pos = _this.windowToCanvas(event.pageX, event.pageY, _this.canvas);
+                        let rate= _this.back.width / _this.size.width;
+                        let x=pos.x*rate;
+                        let y=pos.y*rate;
+                        let min=-1,
+                        final;
+                        console.log(x,y)
+                        _this.points.forEach(point=>{
+                            let arr=point.position.split(',');
+                            let cx=arr[0]-x,
+                                cy=arr[1]-y;
+
+                            let distance=Math.sqrt((cx * cx) + (cy * cy));
+                            if(min==-1||distance<min){
+                                min=distance;
+                                final=point.position;
+                            }
+
+                            console.log(x,y)
+                        })
+                        if(!_this.startPoint||_this.endPoint){
+                            _this.startPoint=final;
+                            _this.endPoint=null;
+                        }else{
+                            if(!_this.endPoint){
+                                _this.endPoint=final;
+                            }
+                        }
+
+                        if(_this.endPoint){
+                            let s=_this.startPoint.split(",");
+                            e=_this.endPoint.split(",");
+                            _this.setPoint({x:s[0]/rate,y:s[1]/rate},{x:e[0]/rate,y:e[1]/rate})
+                        }
+                        console.log(pos)
+                    }else{
+                        //changedTouches[0]
+
+                        let pos = _this.windowToCanvas(event.pageX, event.pageY, _this.canvas)
+                        console.log(_this.windowToCanvas(event.pageX, event.pageY, _this.canvas));
+                        // _this.ctx.clearRect(0,0,_this.canvas.width,_this.canvas.height);
+                        // _this.setImg();
+                        _this.printAll();
+                        setTimeout(() => {
+                            _this.ctx.beginPath();
+                            _this.ctx.arc(pos.x, pos.y, 5, 0, 360);
+                            _this.ctx.closePath();
+                            _this.ctx.lineWidth = 5;
+                            _this.ctx.strokeStyle = "rgb(0,25,255)";
+                            _this.ctx.stroke();
+                            _this.position=`${(pos.x*_this.back.zoomPro.rate).toFixed(4)},${(pos.y*_this.back.zoomPro.rate).toFixed(4)}`;
+                            console.log(pos.x,pos.y,_this.back.zoomPro.rate)
+                        })
+                    }
+                }
+            },
+            //屏幕点在画布上对应的位置
+            windowToCanvas(x, y, canvas) {
+                let box = canvas.getBoundingClientRect();  //这个方法返回一个矩形对象，包含四个属性：left、top、right和bottom。分别表示元素各边与页面上边和左边的距离
+                return {
+                    x: x - box.left - (box.width - canvas.width) / 2,
+                    y: y - box.top - (box.height - canvas.height) / 2
+                };
+            },
+            printAll(){
+                let _this=this;
+                _this.ctx.clearRect(0,0,this.canvas.clientWidth, this.canvas.height);
+                this.setImg();
+                this.points.forEach(point=>{
+                    console.log()
+                    let rate= _this.back.width / _this.size.width;
+                    let arr=point.position.split(','),
+                    x=arr[0]/rate,
+                    y=arr[1]/rate;
+
+                    _this.ctx.beginPath();
+                    _this.ctx.arc(x, y, 5, 0, 360);
+                    _this.ctx.closePath();
+                    _this.ctx.lineWidth = 5;
+                    _this.ctx.strokeStyle = "#00FF00";
+                    _this.ctx.stroke();
+                })
+
+            },
+            printLine(){
+                let form = new FormData();
+                form.append('type', 'getLines');
+                form.append('bid', this.bid);
+                form.append('level', this.level);
+                fetch('https://131462.wang/master/php/action.php', {
+                    method: "post",
+                    body: form
+                }).then(r => r.json())
+                    .then(res => {
+                        let rate= this.back.zoomPro.rate;
+                        let data=res.data;
+                        data.forEach(d=>{
+                           this.setPoint({x:Number(d.startPoint.split(',')[0])/rate,y:Number(d.startPoint.split(',')[1])/rate},{x:Number(d.endPoint.split(',')[0])/rate,y:Number(d.endPoint.split(',')[1])/rate})
+                        })
+                        console.log(res)
+                    }).catch(err => {
+                    console.log(err)
+                })
+            },
+            //剩余参数来获取所有的点位
+            setPoint(...rest) {
+                console.log(rest.length,rest);
+                //绘制 起点到终点
+                for (let i = 0; i < rest.length; i++) {
+                    if (i == 0) {
+                        this.ctx.beginPath();//开始绘制线条，若不使用beginPath，则不能绘制多条线条
+                        this.ctx.lineTo(rest[i].x, rest[i].y);
+                    } else if (i == rest.length - 1) {
+                        this.ctx.lineTo(rest[i].x, rest[i].y);
+                        this.ctx.closePath();//结束绘制线条，不是必须的
+                        this.ctx.lineWidth = 2;//设置线条宽度
+                        this.ctx.strokeStyle = "blue";//设置线条颜色
+                        this.ctx.stroke();//用于绘制线条
+                    } else {
+                        this.ctx.lineTo(rest[i].x, rest[i].y);
+                    }
+                }
+                console.log("线条绘制完成",)
+            },
+            getPoints(){
+                if(!this.bid||!this.level){
+                    alert("请设置bid和level")
+                    console.log("请设置bid和level")
+                    return;
+                }
+                let _this=this;
+                let form = new FormData();
+                form.append('type', 'readAll');
+                fetch('https://131462.wang/master/php/action.php', {
+                    method: "post",
+                    body: form
+                }).then(r => r.json())
+                    .then(res => {
+                        //bid和level相同的
+                       _this.points=res.rooms.filter(room=>{
+                            return room.bid==_this.bid&&room.level==_this.level;
+                        })
+                        _this.printAll();
+                        alert("获取点成功")
+                        console.log(res)
+                    }).catch(err => {
+                    console.log(err)
+                })
+            },
+            setImg(){
+                let _this=this;
+                this.back = new Image();
+                this.back.src =this.nowImg;
+                this.back.onload = function () {
+                    let rate = this.width / _this.size.width;
+                    let width = this.width / rate;
+                    let height = this.height / rate;
+                    let x = 0;
+                    let y = 0,
+                        initW = width,
+                        initH = height,
+                        initX = x,
+                        initY = y;
+
+                    _this.back.zoomPro = {
+                        rate,
+                        initW,
+                        initH,
+                        width,
+                        height,
+                        initX,
+                        initY,
+                        x,
+                        y
+                    };
+                    _this.ctx.drawImage(this, x, y, width, height);
+                    _this.back.type = 'image';
+                }
+            },
+            setLine(){
+                let form = new FormData();
+                form.append('type', 'setLine');
+                form.append('bid', this.bid);
+                form.append('level', this.level);
+                form.append('startPoint', this.startPoint);
+                form.append('endPoint', this.endPoint);
+                fetch('https://131462.wang/master/php/action.php', {
+                    method: "post",
+                    body: form
+                }).then(r => r.json())
+                    .then(res => {
+                        alert("上传成功")
+                        console.log(res)
+                    }).catch(err => {
+                    console.log(err)
+                })
+            },
+            update() {
+                let form = new FormData();
+                form.append('type', 'setPoint');
+                form.append('name', this.name);
+                form.append('description', this.description);
+                form.append('bid', this.bid);
+                form.append('builderName', this.builderName);
+                form.append('level', this.level);
+                form.append('position', this.position);
+                form.append('location', this.location);
+                fetch('https://131462.wang/master/php/action.php', {
+                    method: "post",
+                    body: form
+                }).then(r => r.json())
+                    .then(res => {
+                        alert("上传成功")
+                        console.log(res)
+                    }).catch(err => {
+                    console.log(err)
+                })
+            }
+        }
+    });
+</script>
+</body>
+</html>
