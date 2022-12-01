@@ -1,5 +1,6 @@
 # SmartHospitalGuideSystem
  Smart hospital guide system is a 2d map guide.
+ 智慧医院电子导览系统，个人毕设项目存档。
 
 
 My Sql Structure:
